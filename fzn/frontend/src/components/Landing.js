@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../api";
+import { hasActiveMembership } from "../membershipPlans";
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -13,7 +14,7 @@ export default function Landing() {
       .catch(() => {}); // silently fall back to hardcoded reviews if API fails
   }, []);
 
-  const handleJoinNow = async (plan, price) => {
+  const handleJoinNow = async (plan) => {
     const token = localStorage.getItem('token');
     if (!token) {
       alert("Please login or sign up first to proceed with payment.");
@@ -22,12 +23,14 @@ export default function Landing() {
     }
     try {
       const res = await API.get('/api/payments');
-      const hasPaid = Array.isArray(res.data) && res.data.length > 0;
-      if (hasPaid) {
+      const payments = Array.isArray(res.data) ? res.data : [];
+      if (hasActiveMembership(payments)) {
         alert("You have already purchased a plan ✅");
         navigate("/user");
+      } else if (payments.some(payment => payment.status !== "pending")) {
+        navigate("/user?section=plans");
       } else {
-        navigate(`/payment?plan=${encodeURIComponent(plan)}&price=${encodeURIComponent(price)}`);
+        navigate(`/payment?plan=${encodeURIComponent(plan)}`);
       }
     } catch (err) {
       console.error(err);
@@ -682,7 +685,7 @@ export default function Landing() {
               <li>Smart Workout Plan</li>
               <li>At Home Workout</li>
             </ul>
-            <button className="ln-plan-btn" onClick={() => handleJoinNow('Basic', 10000)}>Join Now →</button>
+            <button className="ln-plan-btn" onClick={() => handleJoinNow('Basic')}>Join Now →</button>
           </div>
 
           <div className="ln-plan-card featured">
@@ -695,7 +698,7 @@ export default function Landing() {
               <li>Smart Workout Plan</li>
               <li>At Home Workout</li>
             </ul>
-            <button className="ln-plan-btn" onClick={() => handleJoinNow('Pro', 14000)}>Join Now →</button>
+            <button className="ln-plan-btn" onClick={() => handleJoinNow('Pro')}>Join Now →</button>
           </div>
 
           <div className="ln-plan-card">
@@ -708,7 +711,7 @@ export default function Landing() {
               <li>Smart Workout Plan</li>
               <li>At Home Workout</li>
             </ul>
-            <button className="ln-plan-btn" onClick={() => handleJoinNow('Premium', 20000)}>Join Now →</button>
+            <button className="ln-plan-btn" onClick={() => handleJoinNow('Premium')}>Join Now →</button>
           </div>
         </div>
       </section>

@@ -1,7 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const auth    = require('../middleware/auth');
-const isAdmin = require('../middleware/isadmin');
+const isAdmin = require('../middleware/isAdmin');
 
 const Payment    = require('../models/Payment');
 const Booking    = require('../models/Booking');
@@ -15,7 +15,10 @@ router.get('/overview', auth, isAdmin, async (req, res) => {
     const totalMembers = await User.countDocuments({ role: 'user' });
     const bookings     = await Booking.countDocuments();
     const trainerHires = await TrainerHire.countDocuments();
-    const revenueAgg   = await Payment.aggregate([{ $group: { _id: null, total: { $sum: "$price" } } }]);
+    const revenueAgg   = await Payment.aggregate([
+      { $match: { $or: [{ status: 'paid' }, { status: { $exists: false } }] } },
+      { $group: { _id: null, total: { $sum: "$price" } } },
+    ]);
     const revenue      = revenueAgg[0] ? revenueAgg[0].total : 0;
     const reviews      = await Review.countDocuments();
     return res.json({ totalMembers, bookings, trainerHires, revenue, reviews });
@@ -29,6 +32,7 @@ router.get('/overview', auth, isAdmin, async (req, res) => {
 router.get('/stats', auth, isAdmin, async (req, res) => {
   try {
     const payments = await Payment.aggregate([
+      { $match: { $or: [{ status: 'paid' }, { status: { $exists: false } }] } },
       { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$date" } }, revenue: { $sum: "$price" }, members: { $sum: 1 } } },
       { $sort: { _id: 1 } }
     ]);

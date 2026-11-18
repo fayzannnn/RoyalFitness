@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const reviewSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   fullname: { type: String },
+  profilePhoto: { type: String, default: '' },
   rating: { type: Number, required: true },
   text: { type: String },
   date: { type: Date, default: Date.now },

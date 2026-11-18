@@ -29,22 +29,19 @@ router.post('/register', async (req, res) => {
     if (exists) return res.status(400).json({ message: 'Email already registered' });
 
     const hashed     = await bcrypt.hash(password, 10);
-    const role       = email.endsWith('@royal.com') ? 'admin' : 'user';
+    const role        = 'user';
     const verifyToken = crypto.randomBytes(32).toString('hex'); // unique token
+    const verifyTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const user = await new User({
       fullname, email, password: hashed, role,
-      isVerified: role === 'admin', // admin emails skip verification
-      verifyToken: role === 'admin' ? null : verifyToken,
+      isVerified: false,
+      verifyToken,
+      verifyTokenExpires,
     }).save();
 
-    // Send verification email for non-admin users
-    if (role !== 'admin') {
-      await sendVerificationEmail(email, fullname, verifyToken);
-      return res.json({ message: 'Registered! Please check your email to verify your account.' });
-    }
-
-    return res.json({ message: 'Admin registered successfully.' });
+    await sendVerificationEmail(email, fullname, verifyToken);
+    return res.json({ message: 'Registered! Please check your email to verify your account.' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Server error' });
@@ -58,11 +55,15 @@ router.get('/verify-email', async (req, res) => {
     const { token } = req.query;
     if (!token) return res.status(400).json({ message: 'Token missing' });
 
-    const user = await User.findOne({ verifyToken: token });
+    const user = await User.findOne({
+      verifyToken: token,
+      verifyTokenExpires: { $gt: new Date() },
+    });
     if (!user) return res.status(400).json({ message: 'Invalid or expired verification link' });
 
     user.isVerified  = true;
     user.verifyToken = null;
+    user.verifyTokenExpires = null;
     await user.save();
 
     // Send welcome email
@@ -141,6 +142,7 @@ router.post('/resend-verification', async (req, res) => {
 
     const verifyToken  = crypto.randomBytes(32).toString('hex');
     user.verifyToken   = verifyToken;
+    user.verifyTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();
     await sendVerificationEmail(email, user.fullname, verifyToken);
 
@@ -189,7 +191,7 @@ router.post('/google', async (req, res) => {
         fullname:     name,
         email,
         password:     require('crypto').randomBytes(32).toString('hex'), // random unusable password
-        role:         email.endsWith('@royal.com') ? 'admin' : 'user',
+        role:         'user',
         googleId,
         authProvider: 'google',
         isVerified:   true,          // Google already verified email

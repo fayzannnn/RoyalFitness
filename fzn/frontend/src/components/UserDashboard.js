@@ -1,14 +1,37 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import API from "../api";
 
+const MEMBERSHIP_PLANS = [
+  {
+    name: "Basic",
+    price: 10000,
+    perks: ["Smart Workout Plan", "At Home Workout", "Basic Diet Guidance"],
+  },
+  {
+    name: "Pro",
+    price: 14000,
+    perks: ["Pro Gym Access", "Smart Workout Plan", "At Home Workout", "Trainer Support"],
+  },
+  {
+    name: "Premium",
+    price: 20000,
+    perks: ["Elite Gym Access", "Personal Trainer", "Diet + Supplement Plan"],
+  },
+];
+
 export default function UserDashboard() {
-  const [activeSection, setActiveSection] = useState("overview");
+  const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState(
+    () => new URLSearchParams(window.location.search).get("section") === "plans" ? "plans" : "overview"
+  );
   const [user, setUser] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [hiredTrainer, setHiredTrainer] = useState(null);
   const [userPlan, setUserPlan] = useState(null);
   const [daysLeft, setDaysLeft] = useState(null);
   const [paymentHistory, setPaymentHistory] = useState([]);
+  const [pendingPayment, setPendingPayment] = useState(null);
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [myReviews, setMyReviews]   = useState([]);
@@ -51,8 +74,10 @@ export default function UserDashboard() {
         const payments = paymentsRes.data || [];
         payments.sort((a, b) => new Date(b.date) - new Date(a.date));
         setPaymentHistory(payments);
-        if (payments.length > 0) {
-          const latest = payments[0];
+        setPendingPayment(payments.find(payment => payment.status === "pending") || null);
+        const paidPayments = payments.filter(payment => payment.status !== "pending");
+        if (paidPayments.length > 0) {
+          const latest = paidPayments[0];
           setUserPlan({
             plan: latest.plan,
             price: latest.price,
@@ -89,7 +114,11 @@ export default function UserDashboard() {
     } catch (err) { console.error(err); alert("Hire failed"); }
   };
 
-  const handleRenew = () => { window.location.href = "/#plans"; };
+  const handleRenew = () => setActiveSection("plans");
+
+  const handleChoosePlan = (plan) => {
+    navigate(`/payment?plan=${encodeURIComponent(plan)}&returnTo=plans`);
+  };
 
   const handleReviewSubmit = async () => {
     if (rating === 0 || reviewText.trim() === "") { alert("Provide rating and text"); return; }
@@ -117,7 +146,7 @@ export default function UserDashboard() {
 
   const handleProfileSave = async () => {
     try {
-      const res = await API.put("/api/auth/profile", {
+      await API.put("/api/auth/profile", {
         fullname:     profileForm.fullname,
         phone:        profileForm.phone,
         dob:          profileForm.dob,
@@ -164,6 +193,7 @@ export default function UserDashboard() {
   const navItems = [
     { key: "overview", label: "Overview",  icon: "⬛" },
     { key: "plan",     label: "My Plan",   icon: "🏋" },
+    { key: "plans",    label: "Plans",     icon: "💳" },
     { key: "trainer",  label: "Trainer",   icon: "👤" },
     { key: "diet",     label: "Diet",      icon: "🥗" },
     { key: "payments", label: "Payments",  icon: "💳" },
@@ -685,12 +715,20 @@ export default function UserDashboard() {
           </div>
 
           <div className="ud-content">
+            {pendingPayment && (
+              <div className="ud-card" role="status" style={{ marginBottom: 16, borderColor: "rgba(224,180,90,0.35)" }}>
+                <div className="ud-card-title" style={{ color: "#e0b45a" }}>Cash payment awaiting confirmation</div>
+                <p className="ud-muted">
+                  Your {pendingPayment.plan} membership will activate after the front desk confirms your cash payment.
+                </p>
+              </div>
+            )}
 
             {/* ── OVERVIEW ── */}
             {activeSection === "overview" && (
               <>
                 {userPlan && daysLeft === 0 && <ExpiredBanner />}
-                {!userPlan && <NoPlanBanner />}
+                {!userPlan && !pendingPayment && <NoPlanBanner />}
 
                 <div className="ud-stat-grid">
                   <div className="ud-stat-card">
@@ -736,7 +774,12 @@ export default function UserDashboard() {
                     ? <p className="ud-green" style={{ fontSize: 15 }}>
                         Your {userPlan.plan} plan {daysLeft === 0 ? "expired on" : "expires on"} <strong>{userPlan.expiryDate}</strong>
                       </p>
-                    : <p className="ud-muted">No active plan. <a href="/#plans" style={{ color: "#a3d959" }}>Browse plans →</a></p>}
+                    : <p className="ud-muted">
+                        No active plan.{" "}
+                        <button onClick={handleRenew} style={{ background:"none", border:"none", color:"#a3d959", cursor:"pointer" }}>
+                          Browse plans →
+                        </button>
+                      </p>}
                 </div>
               </>
             )}
@@ -806,6 +849,32 @@ export default function UserDashboard() {
                   </div>
                 )}
               </>
+            )}
+
+            {activeSection === "plans" && (
+              <div className="ud-card">
+                <div className="ud-card-title">Choose a Membership Plan</div>
+                <p className="ud-muted" style={{ marginBottom: 20 }}>
+                  Select a plan to renew your membership. Your membership details will remain in your dashboard.
+                </p>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(210px, 1fr))", gap:16 }}>
+                  {MEMBERSHIP_PLANS.map((plan) => (
+                    <div key={plan.name} style={{ background:"#111", border:"1px solid #222", borderRadius:12, padding:20 }}>
+                      <h3 style={{ color:"#f0ede8", marginBottom:8 }}>{plan.name}</h3>
+                      <div style={{ color:"#a3d959", fontSize:24, fontWeight:600 }}>
+                        ₹{plan.price.toLocaleString("en-IN")}
+                      </div>
+                      <div className="ud-muted" style={{ marginBottom:16 }}>per month</div>
+                      <ul style={{ minHeight:100, paddingLeft:18, color:"#888", lineHeight:1.9 }}>
+                        {plan.perks.map(perk => <li key={perk}>{perk}</li>)}
+                      </ul>
+                      <button className="ud-renew-btn" onClick={() => handleChoosePlan(plan.name)}>
+                        Choose {plan.name} →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* ── TRAINER ── */}
@@ -964,16 +1033,20 @@ export default function UserDashboard() {
                         <th>Plan</th>
                         <th>Price</th>
                         <th>Date & Time</th>
+                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paymentHistory.length === 0
-                        ? <tr><td colSpan={3} className="ud-muted">No payments yet.</td></tr>
+                        ? <tr><td colSpan={4} className="ud-muted">No payments yet.</td></tr>
                         : paymentHistory.map((p, i) => (
                           <tr key={i}>
                             <td><span className="ud-badge">{p.plan}</span></td>
                             <td className="ud-green">₹{p.price}</td>
                             <td className="ud-muted">{formatDateTimeForTable(p.date)}</td>
+                            <td className={p.status === "pending" ? "ud-muted" : "ud-green"}>
+                              {p.status === "pending" ? "Awaiting confirmation" : "Paid"}
+                            </td>
                           </tr>
                         ))}
                     </tbody>

@@ -1,6 +1,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import API from "../api";
+import { PLAN_PRICES, resolvePlan } from "../membershipPlans";
 
 const loadRazorpayScript = () =>
   new Promise((resolve) => {
@@ -28,9 +29,13 @@ export default function PaymentPage() {
   const [cashDone, setCashDone]         = React.useState(false);
 
   const queryParams = new URLSearchParams(location.search);
-  const plan  = queryParams.get("plan")  || "Basic";
-  const price = Number(queryParams.get("price") || 10000);
+  const requestedPlan = queryParams.get("plan");
+  const plan = resolvePlan(requestedPlan);
+  const price = PLAN_PRICES[plan];
   const perks = PLAN_PERKS[plan] || PLAN_PERKS.Basic;
+  const returnPath = queryParams.get("returnTo") === "plans"
+    ? "/user?section=plans"
+    : "/user";
 
   React.useEffect(() => {
     if (!localStorage.getItem("token")) {
@@ -48,7 +53,7 @@ export default function PaymentPage() {
       if (!loaded) throw new Error("Failed to load Razorpay. Check your internet connection.");
 
       const user = JSON.parse(localStorage.getItem("user") || "{}");
-      const { data } = await API.post("/api/payments/create-order", { plan, price });
+      const { data } = await API.post("/api/payments/create-order", { plan });
       if (!data.success) throw new Error(data.message || "Could not create order");
 
       const options = {
@@ -66,12 +71,10 @@ export default function PaymentPage() {
               razorpay_order_id:  response.razorpay_order_id,
               razorpay_payment_id:response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              plan,
-              price,
             });
             if (verifyRes.data.success) {
-              alert(`Payment of ₹${price.toLocaleString("en-IN")} for ${plan} Plan Successful ✅`);
-              navigate("/user");
+              alert(`Payment of ₹${data.price.toLocaleString("en-IN")} for ${plan} Plan Successful ✅`);
+              navigate(returnPath);
             } else {
               throw new Error("Payment verification failed");
             }
@@ -100,11 +103,11 @@ export default function PaymentPage() {
   const handleCashPayment = async () => {
     setCashLoading(true);
     try {
-      const res = await API.post("/api/payments/cash", { plan, price });
+      const res = await API.post("/api/payments/cash", { plan });
       if (res.data.success) {
         setCashDone(true);
         setShowCashModal(false);
-        setTimeout(() => navigate("/user"), 2000);
+        setTimeout(() => navigate(returnPath), 2000);
       }
     } catch (err) {
       alert(err?.response?.data?.message || "Cash payment recording failed. Try again.");

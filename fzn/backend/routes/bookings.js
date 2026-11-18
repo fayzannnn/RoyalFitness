@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Booking = require('../models/Booking');
 const auth = require('../middleware/auth');
-const isAdmin = require('../middleware/isadmin');
+const isAdmin = require('../middleware/isAdmin');
 
 // create booking (open to anyone)
 router.post('/', async (req, res) => {

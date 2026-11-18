@@ -3,7 +3,7 @@ const router   = express.Router();
 const Trainer  = require('../models/Trainer');
 const TrainerHire = require('../models/TrainerHire');
 const auth     = require('../middleware/auth');
-const isAdmin  = require('../middleware/isadmin');
+const isAdmin  = require('../middleware/isAdmin');
 
 // ── GET /api/trainers — list all trainers (public) ─────────────────────────
 router.get('/', async (req, res) => {

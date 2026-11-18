@@ -21,6 +21,7 @@ const userSchema = new mongoose.Schema({
   // ── Email verification ─────────────────────────────────────────────────────
   isVerified:   { type: Boolean, default: false },
   verifyToken:  { type: String,  default: null  }, // UUID token sent in email link
+  verifyTokenExpires: { type: Date, default: null },
 
   // ── Password reset OTP ─────────────────────────────────────────────────────
   resetOTP:       { type: String, default: null },

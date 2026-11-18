@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import API from "../api";
 
-export default function Login({ setRole }) {
+export default function Login() {
   const [view, setView] = useState("login");
   // OTP is now verified server-side — no local OTP state needed
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,6 @@ export default function Login({ setRole }) {
       localStorage.setItem("isLoggedIn", "true");
 
       if (user.role === "admin") {
-        setRole("admin");
         navigate("/admin");
         return;
       }
@@ -42,12 +41,12 @@ export default function Login({ setRole }) {
       // Check if user has payments → navigate accordingly
       try {
         const payments = await API.get("/api/payments");
-        const hasPaid  = Array.isArray(payments.data) && payments.data.length > 0;
+        const hasPayment = Array.isArray(payments.data) && payments.data.length > 0;
+        const hasPaid  = Array.isArray(payments.data) &&
+          payments.data.some(payment => payment.status !== "pending");
         if (hasPaid) localStorage.setItem("paid_" + user.email, "true");
-        setRole("user");
-        navigate(hasPaid ? "/user" : "/");
+        navigate(hasPayment ? "/user" : "/");
       } catch {
-        setRole("user");
         navigate("/");
       }
     } catch (err) {
@@ -83,7 +82,6 @@ export default function Login({ setRole }) {
       localStorage.setItem("isLoggedIn", "true");
 
       if (user.role === "admin") {
-        setRole("admin");
         alert(`👑 Welcome Admin ${user.fullname}!`);
         navigate("/admin");
         return;
@@ -91,19 +89,16 @@ export default function Login({ setRole }) {
 
       const payments = await API.get("/api/payments");
       const paymentsData = Array.isArray(payments.data) ? payments.data : [];
-      const hasPaid = paymentsData.length > 0;
+      const hasPayment = paymentsData.length > 0;
+      const hasPaid = paymentsData.some(payment => payment.status !== "pending");
       if (hasPaid) localStorage.setItem("paid_" + user.email, "true");
 
-      setRole("user");
       alert("👋 Welcome " + user.fullname + "!");
 
       // Navigate based on whether user has ever purchased a plan
-      if (hasPaid) {
-        // Has a plan (active or expired) → go to dashboard
-        // Expired users will see the renewal banner inside UserDashboard
+      if (hasPayment) {
         navigate("/user");
       } else {
-        // No plan yet → go to landing page to browse plans
         navigate("/");
       }
     } catch (err) {

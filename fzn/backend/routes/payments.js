@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const auth = require('../middleware/auth');
+const isAdmin = require('../middleware/isAdmin');
 
 const Payment = require('../models/Payment');
 const User = require('../models/User');
+const { getPlanPrice, addOneMonth } = require('../utils/membershipPlans');
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -16,13 +19,14 @@ const razorpay = new Razorpay({
 // Frontend calls this first to get an order_id before opening the modal
 router.post('/create-order', auth, async (req, res) => {
   try {
-    const { plan, price } = req.body;
+    const { plan } = req.body;
+    const price = getPlanPrice(plan);
+    if (price === null) return res.status(400).json({ message: 'Invalid membership plan' });
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // price comes in as rupees (e.g. 999), Razorpay needs paise (99900)
-    const amountInPaise = Math.round(Number(price) * 100);
+    const amountInPaise = price * 100;
 
     const order = await razorpay.orders.create({
       amount: amountInPaise,
@@ -37,6 +41,7 @@ router.post('/create-order', auth, async (req, res) => {
       amount: order.amount,
       currency: order.currency,
       keyId: process.env.RAZORPAY_KEY_ID,
+      price,
     });
   } catch (err) {
     console.error('create-order error:', err);
@@ -48,34 +53,52 @@ router.post('/create-order', auth, async (req, res) => {
 // Frontend calls this after user completes payment in the Razorpay modal
 router.post('/verify', auth, async (req, res) => {
   try {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      plan,
-      price,
-    } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    if (!razorpay_order_id || !razorpay_payment_id || !/^[0-9a-f]{64}$/i.test(razorpay_signature || '')) {
+      return res.status(400).json({ message: 'Invalid payment details' });
+    }
 
-    // Verify HMAC signature — proves Razorpay actually processed the payment
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const expectedSignature = crypto
+    const expectedSignature = Buffer.from(crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
       .update(body)
-      .digest('hex');
+      .digest('hex'), 'hex');
+    const suppliedSignature = Buffer.from(razorpay_signature, 'hex');
 
-    if (expectedSignature !== razorpay_signature) {
+    if (expectedSignature.length !== suppliedSignature.length ||
+        !crypto.timingSafeEqual(expectedSignature, suppliedSignature)) {
       return res.status(400).json({ message: 'Payment verification failed' });
+    }
+
+    const order = await razorpay.orders.fetch(razorpay_order_id);
+    const plan = order.notes && order.notes.plan;
+    const price = getPlanPrice(plan);
+    if (price === null ||
+        order.notes.userId !== String(req.user.id) ||
+        order.amount !== price * 100 ||
+        order.currency !== 'INR' ||
+        order.status !== 'paid') {
+      return res.status(400).json({ message: 'Payment order does not match this account or plan' });
+    }
+
+    const razorpayPayment = await razorpay.payments.fetch(razorpay_payment_id);
+    if (razorpayPayment.order_id !== order.id ||
+        razorpayPayment.status !== 'captured' ||
+        razorpayPayment.amount !== order.amount) {
+      return res.status(400).json({ message: 'Payment has not been captured for this order' });
+    }
+
+    const existingPayment = await Payment.findOne({ providerId: razorpay_payment_id });
+    if (existingPayment) {
+      return res.status(409).json({ message: 'Payment has already been recorded' });
     }
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Same expiry logic as your old /pay route
     const now = new Date();
-    const expiry = new Date(now);
-    expiry.setMonth(expiry.getMonth() + 1);
+    const expiry = addOneMonth(now);
 
-    // Save to your existing Payment model — all same fields
     const payment = await Payment.create({
       user: user._id,
       name: user.fullname,
@@ -84,7 +107,8 @@ router.post('/verify', auth, async (req, res) => {
       price: Number(price),
       date: now,
       expiry,
-      providerId: razorpay_payment_id,  // your model already has this field!
+      providerId: razorpay_payment_id,
+      status: 'paid',
     });
 
     return res.json({ success: true, message: 'Payment recorded', payment });
@@ -112,18 +136,17 @@ router.get('/', auth, async (req, res) => {
 
 // ── POST /api/payments/cash — records a cash payment ─────────────────────────
 // Used when user chooses to pay at the front desk
-// Saves payment with providerId: "CASH" so admin can identify it
+// Cash reservations remain pending until an admin confirms receipt.
 router.post('/cash', auth, async (req, res) => {
   try {
-    const { plan, price } = req.body;
+    const { plan } = req.body;
+    const price = getPlanPrice(plan);
+    if (price === null) return res.status(400).json({ message: 'Invalid membership plan' });
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const now    = new Date();
-    const expiry = new Date(now);
-    expiry.setMonth(expiry.getMonth() + 1); // 1 month from today
-
     const payment = await Payment.create({
       user:       user._id,
       name:       user.fullname,
@@ -131,13 +154,44 @@ router.post('/cash', auth, async (req, res) => {
       plan,
       price:      Number(price),
       date:       now,
-      expiry,
-      providerId: 'CASH', // clearly marked as cash payment
+      providerId: 'CASH',
+      status:     'pending',
     });
 
     return res.json({ success: true, message: 'Cash payment recorded', payment });
   } catch (err) {
     console.error('cash payment error:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.patch('/:paymentId/confirm-cash', auth, isAdmin, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.paymentId)) {
+      return res.status(400).json({ message: 'Invalid payment ID' });
+    }
+
+    const now = new Date();
+    const payment = await Payment.findOneAndUpdate(
+      {
+        _id: req.params.paymentId,
+        providerId: 'CASH',
+        status: 'pending',
+      },
+      {
+        $set: {
+          status: 'paid',
+          date: now,
+          expiry: addOneMonth(now),
+        },
+      },
+      { new: true }
+    );
+    if (!payment) return res.status(404).json({ message: 'Pending cash payment not found' });
+
+    return res.json({ success: true, message: 'Cash payment confirmed', payment });
+  } catch (err) {
+    console.error('cash payment confirmation error:', err);
     return res.status(500).json({ message: 'Server error' });
   }
 });

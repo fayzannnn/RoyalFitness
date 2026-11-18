@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import * as XLSX from "xlsx"; // npm install xlsx
 import API from "../api";
+import { normalizeAdminPayment } from "../paymentDisplay";
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -9,7 +10,6 @@ import {
 
 export default function AdminDashboard() {
   const [activeSection, setActiveSection] = useState("dashboard");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState("");
   const [members, setMembers] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -26,6 +26,7 @@ export default function AdminDashboard() {
   const [addLoading, setAddLoading]               = useState(false);
   const [trainerForm, setTrainerForm]             = useState({ name:"", specialty:"", experience:"", rating:"", bio:"", photo:"" });
   const [trainerFormErrors, setTrainerFormErrors] = useState({});
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState(null);
 
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem("user") || "{}");
@@ -39,12 +40,12 @@ export default function AdminDashboard() {
   const fetchAll = async () => {
     try {
       const paymentsRes = await API.get("/api/payments");
-      const paymentsData = paymentsRes.data || [];
+      const paymentsData = (paymentsRes.data || []).map(normalizeAdminPayment);
       paymentsData.sort((a, b) => new Date(b.date) - new Date(a.date));
       setPayments(paymentsData);
 
       const map = {};
-      paymentsData.forEach((p) => {
+      paymentsData.filter(payment => payment.status !== "pending").forEach((p) => {
         if (!p.email) return;
         const existing = map[p.email];
         if (!existing || new Date(p.date) > new Date(existing.date)) map[p.email] = p;
@@ -82,6 +83,18 @@ export default function AdminDashboard() {
   };
 
   const logout = () => { localStorage.clear(); window.location.href = "/login"; };
+
+  const handleConfirmCashPayment = async (paymentId) => {
+    setConfirmingPaymentId(paymentId);
+    try {
+      await API.patch(`/api/payments/${paymentId}/confirm-cash`);
+      await fetchAll();
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to confirm cash payment");
+    } finally {
+      setConfirmingPaymentId(null);
+    }
+  };
 
   // ── Add new trainer ───────────────────────────────────────────────────────
   const handleAddTrainer = async (e) => {
@@ -201,6 +214,7 @@ export default function AdminDashboard() {
       "Plan":       p.plan  || "",
       "Price (₹)":  p.price || 0,
       "Payment Date": formatDateTimeForTable(p.date),
+      "Status":     p.status === "pending" ? "Awaiting confirmation" : "Paid",
     }));
     exportToExcel(rows, "Royal_Fitness_Payments", "Payments");
   };
@@ -262,6 +276,7 @@ export default function AdminDashboard() {
       const rows = payments.map((p, i) => ({
         "S.No": i+1, "Name": p.name, "Email": p.email,
         "Plan": p.plan, "Price": p.price, "Date": formatDateTimeForTable(p.date),
+        "Status": p.status === "pending" ? "Awaiting confirmation" : "Paid",
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Payments");
     }
@@ -331,7 +346,10 @@ export default function AdminDashboard() {
     } catch { return dStr ? String(dStr).split("T")[0] : ""; }
   }
 
-  const totalRevenue = payments.reduce((s, p) => s + (Number(p.price) || 0), 0);
+  const totalRevenue = payments.reduce(
+    (s, p) => s + (p.status === "pending" ? 0 : Number(p.price) || 0),
+    0
+  );
 
   // Unique trainers actually hired (not total hire records)
   const uniqueTrainerCount = new Set(
@@ -364,13 +382,6 @@ export default function AdminDashboard() {
         (b.service || "").toLowerCase().includes(q))
     : bookings;
 
-  const filteredHires = q
-    ? trainerHires.filter(h =>
-        (h.user?.fullname    || "").toLowerCase().includes(q) ||
-        (h.trainer?.name     || "").toLowerCase().includes(q) ||
-        (h.trainer?.specialty|| "").toLowerCase().includes(q))
-    : trainerHires;
-
   const filteredReviews = q
     ? reviews.filter(r =>
         (r.fullname || "").toLowerCase().includes(q) ||
@@ -398,8 +409,9 @@ export default function AdminDashboard() {
           const mp = selectedMember.payments || [];
           const mt = selectedMember.hiredTrainer;
           const mr = selectedMember.reviews   || [];
-          const totalSpent = mp.reduce((s, p) => s + (Number(p.price) || 0), 0);
-          const latestPayment = mp[0];
+          const paidPayments = mp.filter(payment => payment.status !== "pending");
+          const totalSpent = paidPayments.reduce((s, p) => s + (Number(p.price) || 0), 0);
+          const latestPayment = paidPayments[0];
           const expiryDate = latestPayment?.expiry ? new Date(latestPayment.expiry) : null;
           const dLeft = expiryDate
             ? Math.max(Math.ceil((expiryDate - new Date()) / (1000*60*60*24)), 0)
@@ -448,7 +460,7 @@ export default function AdminDashboard() {
                 {/* Quick stats */}
                 <div style={{ display:"flex", gap:20, flexShrink:0 }}>
                   {[
-                    { label:"Payments", value: mp.length },
+                    { label:"Payments", value: paidPayments.length },
                     { label:"Total Spent", value: "₹" + totalSpent.toLocaleString("en-IN") },
                     { label:"Reviews", value: mr.length },
                   ].map(s => (
@@ -504,7 +516,7 @@ export default function AdminDashboard() {
                   <h3 className="ad-card-title" style={{ fontSize:16, marginBottom:16 }}>PAYMENT HISTORY</h3>
                   <div className="ad-table-wrap">
                     <table className="ad-table">
-                      <thead><tr><th>#</th><th>Plan</th><th>Price</th><th>Payment Type</th><th>Date</th><th>Expiry</th></tr></thead>
+                      <thead><tr><th>#</th><th>Plan</th><th>Price</th><th>Payment Type</th><th>Status</th><th>Date</th><th>Expiry</th></tr></thead>
                       <tbody>
                         {mp.map((p, i) => {
                           const isCash   = p.providerId === "CASH";
@@ -526,6 +538,7 @@ export default function AdminDashboard() {
                                   {isCash ? "💵 Cash" : isOnline ? "💳 Online" : "—"}
                                 </span>
                               </td>
+                              <td>{p.status === "pending" ? "Awaiting confirmation" : "Paid"}</td>
                               <td className="ad-muted">{formatSimpleDate(p.date)}</td>
                               <td className="ad-muted">{formatSimpleDate(p.expiry)}</td>
                             </tr>
@@ -945,7 +958,7 @@ export default function AdminDashboard() {
               <div className="ad-table-wrap">
                 <table className="ad-table">
                   <thead><tr>
-                    <th>#</th><th>User</th><th>Email</th><th>Plan</th><th>Price</th><th>Date & Time</th>
+                    <th>#</th><th>User</th><th>Email</th><th>Plan</th><th>Price</th><th>Date & Time</th><th>Status</th>
                   </tr></thead>
                   <tbody>
                     {filteredPayments.map((p, i) => (
@@ -955,6 +968,19 @@ export default function AdminDashboard() {
                         <td><span className="ad-badge">{p.plan}</span></td>
                         <td className="ad-green">₹{p.price}</td>
                         <td className="ad-muted">{formatDateTimeForTable(p.date)}</td>
+                        <td>
+                          {p.status === "pending" && p.providerId === "CASH" ? (
+                            <button
+                              onClick={() => handleConfirmCashPayment(p._id)}
+                              disabled={confirmingPaymentId === p._id}
+                              style={{ padding:"6px 10px", background:"rgba(224,180,90,0.12)", border:"1px solid rgba(224,180,90,0.35)", borderRadius:7, color:"#e0b45a", fontSize:11, cursor:confirmingPaymentId === p._id ? "wait" : "pointer" }}
+                            >
+                              {confirmingPaymentId === p._id ? "Confirming..." : "Confirm cash"}
+                            </button>
+                          ) : (
+                            <span className="ad-green">Paid</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

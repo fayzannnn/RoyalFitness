@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
@@ -16,14 +16,12 @@ function RequireAuth({ children }) {
 }
 
 export default function App() {
-  const [role, setRole] = useState(null);
-
   return (
     <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
       <BrowserRouter>
         <Routes>
           <Route path="/"             element={<Landing />} />
-          <Route path="/login"        element={<Login setRole={setRole} />} />
+          <Route path="/login"        element={<Login />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/book"         element={<BookClass />} />
           <Route path="/payment"      element={<RequireAuth><PaymentPage /></RequireAuth>} />

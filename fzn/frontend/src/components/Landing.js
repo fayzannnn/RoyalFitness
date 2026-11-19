@@ -584,13 +584,35 @@ export default function Landing() {
           .ln-reviews-layout { grid-template-columns: 1fr; }
           .ln-reviews-left { position: static; }
           .ln-reviews-headline { font-size: 4rem; }
-          .ln-nav { display: none; }
+          .ln-header {
+            height: auto;
+            min-height: 70px;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px 5%;
+          }
+          .ln-header > nav {
+            order: 3;
+            width: 100%;
+            min-width: 0;
+          }
+          .ln-nav {
+            width: 100%;
+            gap: 2.4rem;
+            overflow-x: auto;
+            padding-bottom: 6px;
+            scrollbar-width: thin;
+          }
+          .ln-nav li { flex: 0 0 auto; }
+          .ln-header-right { margin-left: auto; }
+          .ln-welcome { display: none; }
         }
       `}</style>
 
       {/* HEADER */}
       <header className="ln-header">
         <a href="#home" className="ln-logo">ROYAL <span>FITNESS</span></a>
+        <nav aria-label="Main navigation">
         <ul className="ln-nav">
           <li><a href="#home">Home</a></li>
           <li><a href="#service">Services</a></li>
@@ -598,6 +620,7 @@ export default function Landing() {
           <li><a href="#plans">Pricing</a></li>
           <li><a href="#reviews">Reviews</a></li>
         </ul>
+        </nav>
         <div className="ln-header-right">
           {isLoggedIn ? (
             <>

@@ -662,8 +662,39 @@ export default function UserDashboard() {
         .ud-saved-msg { grid-column: 1 / -1; text-align: center; font-size: 13px; color: #a3d959; padding: 8px; background: rgba(163,217,89,0.08); border: 1px solid rgba(163,217,89,0.2); border-radius: 8px; }
 
         @media (max-width: 900px) {
-          .ud-sidebar { display: none; }
-          .ud-main { margin-left: 0; }
+          .ud-sidebar {
+            width: 100%;
+            height: auto;
+            top: auto;
+            right: 0;
+            bottom: 0;
+            padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+            border-right: 0;
+            border-top: 1px solid #1a1a1a;
+            overflow: hidden;
+          }
+          .ud-logo, .ud-logo-sub, .ud-sidebar-footer { display: none; }
+          .ud-nav {
+            flex: none;
+            flex-direction: row;
+            gap: 4px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+          }
+          .ud-nav-btn {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 64px;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
+            padding: 8px 10px;
+            font-size: 11px;
+            text-align: center;
+            white-space: nowrap;
+          }
+          .ud-nav-dot { display: none; }
+          .ud-main { margin-left: 0; padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
           .ud-stat-grid { grid-template-columns: 1fr 1fr; }
           .ud-diet-grid { grid-template-columns: 1fr; }
           .ud-diet-cats { grid-template-columns: 1fr; }
@@ -677,7 +708,7 @@ export default function UserDashboard() {
         <aside className="ud-sidebar">
           <div className="ud-logo">ROYAL FITNESS</div>
           <div className="ud-logo-sub">Member Panel</div>
-          <nav className="ud-nav">
+          <nav className="ud-nav" aria-label="Member navigation">
             {navItems.map(n => (
               <button key={n.key}
                 className={`ud-nav-btn ${activeSection === n.key ? "active" : ""}`}

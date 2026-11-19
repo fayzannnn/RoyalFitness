@@ -1553,9 +1553,42 @@ export default function AdminDashboard() {
         .ad-export-btn:hover { background: rgba(163,217,89,0.1); }
 
         @media (max-width: 700px) {
-          .ad-sidebar { display: none; }
-          .ad-main { margin-left: 0; }
+          .ad-sidebar {
+            width: 100%;
+            height: auto;
+            top: auto;
+            right: 0;
+            bottom: 0;
+            padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+            overflow: hidden;
+            border-right: 0;
+            border-top: 1px solid #1a1a1a;
+          }
+          .ad-sidebar-logo, .ad-sidebar-sub, .ad-sidebar-footer { display: none; }
+          .ad-nav {
+            flex: none;
+            flex-direction: row;
+            gap: 4px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+          }
+          .ad-nav-item {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 64px;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
+            padding: 8px 10px;
+            text-align: center;
+            white-space: nowrap;
+          }
+          .ad-nav-dot { display: none; }
+          .ad-main { margin-left: 0; padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
           .ad-stat-grid { grid-template-columns: 1fr 1fr; }
+          .ad-topbar { padding: 16px; }
+          .ad-topbar-right { min-width: 0; }
+          .ad-search { width: 150px; }
         }
       `}</style>
 
@@ -1566,7 +1599,7 @@ export default function AdminDashboard() {
           <div className="ad-sidebar-logo">ROYAL FITNESS</div>
           <div className="ad-sidebar-sub">Admin Panel</div>
 
-          <nav className="ad-nav">
+          <nav className="ad-nav" aria-label="Admin navigation">
             {navItems.map(n => (
               <button key={n.key}
                 className={`ad-nav-item ${activeSection === n.key ? "active" : ""}`}

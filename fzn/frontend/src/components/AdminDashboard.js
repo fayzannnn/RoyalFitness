@@ -555,8 +555,8 @@ export default function AdminDashboard() {
                 <div className="ad-card">
                   <h3 className="ad-card-title" style={{ fontSize:16, marginBottom:16 }}>REVIEWS ({mr.length})</h3>
                   <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                    {mr.map((r, i) => (
-                      <div key={i} style={{ background:"#0f0f0f", border: r.featured ? "1px solid rgba(163,217,89,0.25)" : "1px solid #1a1a1a", borderRadius:10, padding:"14px 16px" }}>
+                    {mr.map(r => (
+                      <div key={r._id} style={{ background:"#0f0f0f", border: r.featured ? "1px solid rgba(163,217,89,0.25)" : "1px solid #1a1a1a", borderRadius:10, padding:"14px 16px" }}>
                         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
                           <div style={{ color:"#a3d959", fontSize:14, letterSpacing:2 }}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</div>
                           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -995,16 +995,14 @@ export default function AdminDashboard() {
         return (
           <div className="ad-card">
             {/* Header row with count */}
-            <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:20 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <div className="ad-review-header">
+              <div className="ad-review-heading">
                 <h2 className="ad-section-title" style={{ marginBottom:0 }}>User Reviews</h2>
-                <button onClick={exportReviews} style={{padding:"6px 12px",background:"transparent",border:"1px solid rgba(163,217,89,0.4)",borderRadius:8,color:"#a3d959",fontSize:11,fontWeight:500,cursor:"pointer",fontFamily:"DM Sans,sans-serif",display:"flex",alignItems:"center",gap:5,transition:"all 0.2s"}}
-                  onMouseEnter={e=>e.currentTarget.style.background="rgba(163,217,89,0.1)"}
-                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <button className="ad-export-btn" onClick={exportReviews}>
                   ⬇ Export
                 </button>
               </div>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div className="ad-review-status">
                 <div style={{
                   display:"flex", alignItems:"center", gap:6,
                   background: featuredCount >= 3 ? "rgba(163,217,89,0.1)" : "rgba(163,217,89,0.05)",
@@ -1017,7 +1015,7 @@ export default function AdminDashboard() {
                   <span style={{ fontSize:11, color:"#555" }}>featured on landing page</span>
                 </div>
                 {featuredCount >= 3 && (
-                  <span style={{ fontSize:11, color:"#e05a5a", background:"rgba(224,90,90,0.08)", border:"1px solid rgba(224,90,90,0.2)", borderRadius:6, padding:"4px 10px" }}>
+                  <span className="ad-review-max" style={{ fontSize:11, color:"#e05a5a", background:"rgba(224,90,90,0.08)", border:"1px solid rgba(224,90,90,0.2)", borderRadius:6, padding:"4px 10px" }}>
                     Max reached — unfeature one to swap
                   </span>
                 )}
@@ -1032,8 +1030,8 @@ export default function AdminDashboard() {
                  <button onClick={()=>setSearchQuery("")} style={{background:"none",border:"none",color:"#555",cursor:"pointer",fontSize:12,textDecoration:"underline"}}>clear</button>
                </div>) : (
               <div className="ad-reviews-grid">
-                {filteredReviews.map((r, i) => (
-                  <div key={i} className="ad-review-card" style={{
+                {filteredReviews.map(r => (
+                  <div key={r._id} className="ad-review-card" style={{
                     border: r.featured ? "1px solid rgba(163,217,89,0.35)" : "1px solid #1a1a1a",
                     background: r.featured ? "rgba(163,217,89,0.04)" : "#0f0f0f",
                     transition: "all 0.2s",
@@ -1478,18 +1476,22 @@ export default function AdminDashboard() {
 
         /* ── Reviews ── */
         .ad-reviews-grid { display: flex; flex-direction: column; gap: 12px; }
+        .ad-review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .ad-review-heading, .ad-review-status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .ad-review-status { gap: 8px; }
         .ad-review-card {
           background: #0f0f0f;
           border: 1px solid #1a1a1a;
           border-radius: 10px;
           padding: 16px;
+          min-width: 0;
           transition: border-color 0.2s;
         }
         .ad-review-card:hover { border-color: #2a2a2a; }
         .ad-review-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .ad-review-name { font-size: 14px; color: #f0ede8; font-weight: 500; }
+        .ad-review-name { font-size: 14px; color: #f0ede8; font-weight: 500; overflow-wrap: anywhere; }
         .ad-review-stars { color: #a3d959; font-size: 14px; letter-spacing: 2px; margin-bottom: 8px; }
-        .ad-review-text { font-size: 13px; color: #666; line-height: 1.6; }
+        .ad-review-text { font-size: 13px; color: #666; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
 
         /* ── Charts ── */
         .ad-chart-block { margin-top: 24px; }
@@ -1589,6 +1591,10 @@ export default function AdminDashboard() {
           .ad-topbar { padding: 16px; }
           .ad-topbar-right { min-width: 0; }
           .ad-search { width: 150px; }
+          .ad-main { min-width: 0; width: 100%; }
+          .ad-content { padding: 16px; }
+          .ad-review-top { align-items: flex-start; flex-direction: column; gap: 8px; }
+          .ad-review-header { align-items: flex-start; }
         }
       `}</style>
 

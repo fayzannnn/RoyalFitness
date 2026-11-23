@@ -35,6 +35,9 @@ export default function UserDashboard() {
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [myReviews, setMyReviews]   = useState([]);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewSuccess, setReviewSuccess] = useState("");
   const [selectedDiet, setSelectedDiet] = useState(null);
   const [activeDietPlan, setActiveDietPlan] = useState(
     () => localStorage.getItem("activeDietPlan") || null
@@ -121,15 +124,28 @@ export default function UserDashboard() {
   };
 
   const handleReviewSubmit = async () => {
-    if (rating === 0 || reviewText.trim() === "") { alert("Provide rating and text"); return; }
+    const text = reviewText.trim();
+    if (rating === 0 || text === "") {
+      setReviewError("Choose a rating and write a review before submitting.");
+      setReviewSuccess("");
+      return;
+    }
+
+    setReviewSubmitting(true);
+    setReviewError("");
+    setReviewSuccess("");
     try {
-      await API.post("/api/reviews", { rating, text: reviewText });
-      setRating(0); setReviewText("");
-      // Refresh my reviews list instantly after submit
-      const reviewsRes = await API.get("/api/reviews/my");
-      setMyReviews(reviewsRes.data || []);
-      alert("Review submitted ✅");
-    } catch (err) { console.error(err); alert("Review failed"); }
+      const response = await API.post("/api/reviews", { rating, text });
+      setMyReviews(prev => [response.data.review, ...prev]);
+      setRating(0);
+      setReviewText("");
+      setReviewSuccess("Review submitted successfully.");
+    } catch (err) {
+      console.error(err);
+      setReviewError(err.response?.data?.message || "Review could not be submitted. Please try again.");
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   const handlePhotoChange = (e) => {
@@ -620,16 +636,23 @@ export default function UserDashboard() {
 
         /* Review */
         .ud-review-wrap { background: #111; border: 1px solid #1a1a1a; border-radius: 12px; padding: 24px; max-width: 540px; }
-        .ud-stars { display: flex; gap: 8px; margin-bottom: 18px; }
-        .ud-star { font-size: 28px; cursor: pointer; transition: transform 0.1s; line-height: 1; }
+        .ud-review-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+        .ud-review-list { min-width: 0; }
+        .ud-stars { display: flex; align-items: center; gap: 4px; margin-bottom: 18px; }
+        .ud-star { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; background: transparent; color: #222; font-size: 28px; cursor: pointer; transition: transform 0.1s, color 0.1s; line-height: 1; touch-action: manipulation; }
         .ud-star:hover { transform: scale(1.15); }
         .ud-star.on { color: #a3d959; }
         .ud-star.off { color: #222; }
-        .ud-textarea { width: 100%; min-height: 110px; background: #0f0f0f; border: 1px solid #1e1e1e; border-radius: 8px; padding: 12px 14px; font-size: 14px; color: #f0ede8; font-family: 'DM Sans', sans-serif; resize: vertical; outline: none; transition: border-color 0.2s; }
+        .ud-rating-value { margin-left: 8px; font-size: 12px; color: #777; }
+        .ud-textarea { display: block; width: 100%; min-width: 0; min-height: 110px; background: #0f0f0f; border: 1px solid #1e1e1e; border-radius: 8px; padding: 12px 14px; font-size: 14px; color: #f0ede8; font-family: 'DM Sans', sans-serif; resize: vertical; outline: none; transition: border-color 0.2s; }
         .ud-textarea:focus { border-color: #a3d959; }
         .ud-textarea::placeholder { color: #333; }
         .ud-submit-btn { margin-top: 14px; padding: 11px 22px; background: #a3d959; color: #0a0a0a; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.2s; }
         .ud-submit-btn:hover { background: #b8e870; }
+        .ud-submit-btn:disabled { opacity: 0.6; cursor: wait; }
+        .ud-review-feedback { margin-top: 12px; font-size: 13px; line-height: 1.5; }
+        .ud-review-feedback.error { color: #e05a5a; }
+        .ud-review-feedback.success { color: #a3d959; }
 
         /* Profile */
         /* My Reviews */
@@ -638,9 +661,10 @@ export default function UserDashboard() {
         .ud-my-review-card:hover { border-color: #2a2a2a; }
         .ud-my-review-card.featured { border-color: rgba(163,217,89,0.25); background: rgba(163,217,89,0.03); }
         .ud-my-review-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .ud-my-review-top > div:last-child { flex-wrap: wrap; }
         .ud-my-review-stars { color: #a3d959; font-size: 14px; letter-spacing: 2px; }
         .ud-my-review-date { font-size: 11px; color: #444; }
-        .ud-my-review-text { font-size: 13px; color: #666; line-height: 1.65; font-weight: 300; font-style: italic; }
+        .ud-my-review-text { font-size: 13px; color: #666; line-height: 1.65; font-weight: 300; font-style: italic; overflow-wrap: anywhere; }
         .ud-my-review-text::before { content: '"'; }
         .ud-my-review-text::after  { content: '"'; }
         .ud-featured-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 100px; font-size: 10px; font-weight: 500; background: rgba(163,217,89,0.1); color: #a3d959; border: 1px solid rgba(163,217,89,0.25); }
@@ -711,6 +735,10 @@ export default function UserDashboard() {
           .ud-profile-form { grid-template-columns: minmax(0, 1fr); }
           .ud-form-field { min-width: 0; }
           .ud-form-input, .ud-form-select { width: 100%; min-width: 0; }
+          .ud-review-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+          .ud-review-wrap { padding: 16px; }
+          .ud-star { width: 44px; height: 44px; }
+          .ud-my-review-top { align-items: flex-start; flex-direction: column; gap: 6px; }
         }
       `}</style>
 
@@ -1100,26 +1128,35 @@ export default function UserDashboard() {
 
             {/* ── REVIEW ── */}
             {activeSection === "review" && (
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, alignItems:"start" }}>
+              <div className="ud-review-layout">
 
                 {/* ── LEFT: Write new review ── */}
                 <div className="ud-review-wrap" style={{ maxWidth:"100%" }}>
                   <div className="ud-card-title" style={{ marginBottom:16 }}>Write a Review</div>
-                  <div className="ud-stars">
+                  <div className="ud-stars" role="group" aria-label="Choose a rating">
                     {[1, 2, 3, 4, 5].map(s => (
-                      <span key={s}
+                      <button key={s} type="button"
                         className={`ud-star ${s <= rating ? "on" : "off"}`}
-                        onClick={() => setRating(s)}>★</span>
+                        aria-label={`${s} out of 5 stars`}
+                        aria-pressed={rating === s}
+                        onClick={() => { setRating(s); setReviewError(""); }}>★</button>
                     ))}
+                    <span className="ud-rating-value" aria-live="polite">
+                      {rating ? `${rating}/5` : "Select a rating"}
+                    </span>
                   </div>
                   <textarea className="ud-textarea" value={reviewText}
-                    onChange={e => setReviewText(e.target.value)}
+                    onChange={e => { setReviewText(e.target.value); setReviewError(""); setReviewSuccess(""); }}
                     placeholder="Share your experience at Royal Fitness..." />
-                  <button className="ud-submit-btn" onClick={handleReviewSubmit}>Submit Review →</button>
+                  <button className="ud-submit-btn" onClick={handleReviewSubmit} disabled={reviewSubmitting}>
+                    {reviewSubmitting ? "Submitting..." : "Submit Review →"}
+                  </button>
+                  {reviewError && <p className="ud-review-feedback error" role="alert">{reviewError}</p>}
+                  {reviewSuccess && <p className="ud-review-feedback success" role="status">{reviewSuccess}</p>}
                 </div>
 
                 {/* ── RIGHT: Previous reviews ── */}
-                <div>
+                <div className="ud-review-list">
                   <div className="ud-card-title" style={{ marginBottom:16 }}>
                     My Reviews
                     {myReviews.length > 0 && (
@@ -1137,8 +1174,8 @@ export default function UserDashboard() {
                     </div>
                   ) : (
                     <div className="ud-my-reviews">
-                      {myReviews.map((r, i) => (
-                        <div key={i} className={`ud-my-review-card ${r.featured ? "featured" : ""}`}>
+                      {myReviews.map(r => (
+                        <div key={r._id} className={`ud-my-review-card ${r.featured ? "featured" : ""}`}>
                           <div className="ud-my-review-top">
                             <div className="ud-my-review-stars">
                               {"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}

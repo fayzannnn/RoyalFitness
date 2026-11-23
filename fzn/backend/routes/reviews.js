@@ -10,7 +10,12 @@ const User     = require('../models/User');
 router.post('/', auth, async (req, res) => {
   try {
     const { rating, text } = req.body;
-    if (!rating) return res.status(400).json({ message: 'Rating required' });
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+    if (typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ message: 'Review text required' });
+    }
 
     const user = await User.findById(req.user.id);
     const review = await Review.create({
@@ -18,7 +23,7 @@ router.post('/', auth, async (req, res) => {
       fullname:     user.fullname,
       profilePhoto: user.profilePhoto || '', // snapshot photo at time of review
       rating,
-      text,
+      text:         text.trim(),
     });
     return res.json({ message: 'Review submitted', review });
   } catch (err) {

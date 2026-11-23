@@ -684,6 +684,8 @@ export default function UserDashboard() {
         .ud-save-btn { grid-column: 1 / -1; padding: 12px; background: #a3d959; color: #0a0a0a; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.2s; }
         .ud-save-btn:hover { background: #b8e870; }
         .ud-saved-msg { grid-column: 1 / -1; text-align: center; font-size: 13px; color: #a3d959; padding: 8px; background: rgba(163,217,89,0.08); border: 1px solid rgba(163,217,89,0.2); border-radius: 8px; }
+        .ud-profile-logout-btn { grid-column: 1 / -1; width: 100%; min-height: 44px; margin-top: 4px; padding: 12px; border: 1px solid rgba(224,90,90,0.3); border-radius: 8px; background: rgba(224,90,90,0.06); color: #e05a5a; font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.2s, border-color 0.2s; }
+        .ud-profile-logout-btn:hover { background: rgba(224,90,90,0.12); border-color: rgba(224,90,90,0.5); }
 
         @media (max-width: 900px) {
           .ud-sidebar {
@@ -1279,6 +1281,9 @@ export default function UserDashboard() {
                     </div>
                     <button className="ud-save-btn" onClick={handleProfileSave}>Save Profile →</button>
                     {profileSaved && <div className="ud-saved-msg">✅ Profile saved successfully!</div>}
+                    <button type="button" className="ud-profile-logout-btn" onClick={logout}>
+                      ← Sign Out
+                    </button>
                   </div>
                 </div>
               </div>

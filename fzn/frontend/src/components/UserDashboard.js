@@ -700,6 +700,18 @@ export default function UserDashboard() {
           .ud-diet-cats { grid-template-columns: 1fr; }
           .ud-profile-wrap { grid-template-columns: 1fr; }
         }
+
+        @media (max-width: 600px) {
+          .ud-main { min-width: 0; width: 100%; }
+          .ud-topbar { padding: 14px 16px; }
+          .ud-page-title { font-size: 22px; }
+          .ud-topbar-name { font-size: 11px; }
+          .ud-content { padding: 16px; }
+          .ud-card { padding: 16px; }
+          .ud-profile-form { grid-template-columns: minmax(0, 1fr); }
+          .ud-form-field { min-width: 0; }
+          .ud-form-input, .ud-form-select { width: 100%; min-width: 0; }
+        }
       `}</style>
 
       <div className="ud-root">
